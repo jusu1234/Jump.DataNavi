@@ -13,6 +13,8 @@ using System.Web.Http.Description;
 using Dapper;
 using System.IO;
 using System.Net;
+using CsvHelper;
+using Newtonsoft.Json;
 
 namespace DataNavi.Service.Controllers
 {
@@ -23,40 +25,49 @@ namespace DataNavi.Service.Controllers
     public class WtmController : ApiController
     {
         [HttpGet, Route("GetEnum")]
-        public IEnumerable<string> GetEnum()
+        public IEnumerable<myClass> GetEnum()
         {
-            //var response = Request.CreateResponse();
-            //response.Headers.TransferEncodingChunked = true;
+            string filePath = @"E:\NAS_SAMPLE\";
+            string fileName = "data_1.csv";
+            string fullPath = filePath + fileName;
 
-            StringBuilder sb = new StringBuilder();
-            int nMax = 99999999;
-            // An example of returning large number of objects
-            for (int i =0; i < nMax; i++)
+            // TextReader reader = File.OpenText(fullPath);
+
+            //CsvReader csv = new CsvReader(reader);
+            //csv.Configuration.Delimiter = "\t";
+            //csv.Read();
+            //csv.ReadHeader();
+
+            //System.Diagnostics.Debug.WriteLine("csv.ReadHeader : " + w.ElapsedMilliseconds);
+
+            //using (StreamReader reader = File.OpenText(fullPath))
+            //{
+            //    while (reader.Peek() > -1)
+            //    {
+            //        //var record = csv.GetRecord<myClass>();
+
+            //        yield return reader.ReadLine();
+            //    }
+            //}
+
+            TextReader reader = File.OpenText(fullPath);
+
+            CsvReader csv = new CsvReader(reader);
+            csv.Configuration.Delimiter = "\t";
+            csv.Read();
+            csv.ReadHeader();
+
+            while (csv.Read())
             {
-                //yield return new ReturnModel() { SequenceNumber = i, ID = Guid.NewGuid() };
-                sb.Append(Convert.ToString(i));
-                if(i %  1000000 == 0 && i > 1000000)
-                { 
-                    yield return sb.ToString();
-                    sb.Clear();
-                }
+                var record = csv.GetRecord<myClass>();
 
-                //sb.Append(i);
-
-                //if (i == nMax - 1)
-                //{
-                //    sb.AppendLine();
-                //    yield return sb.ToString();
-                //    sb.Clear();
-                //}
+                yield return record;
             }
         }
 
         [HttpGet, Route("PushStreamContent")]
         public HttpResponseMessage PushStreamContent()
         {
-            int nMax = 99999999;
-
             List<DeptModel> lstModel = new List<DeptModel>();
 
             var param = new DeptModel { DEPTNO = "10"  };
@@ -73,51 +84,40 @@ namespace DataNavi.Service.Controllers
 
             response.Content = new PushStreamContent( async (stream, content, context) =>
             {
-                try
+                string filePath = @"E:\NAS_SAMPLE\";
+                string fileName = "big_data_1.csv";
+                string fullPath = filePath + fileName;
+
+                // TextReader reader = File.OpenText(fullPath);
+
+                //CsvReader csv = new CsvReader(reader);
+                //csv.Configuration.Delimiter = "\t";
+                //csv.Read();
+                //csv.ReadHeader();
+
+                //System.Diagnostics.Debug.WriteLine("csv.ReadHeader : " + w.ElapsedMilliseconds);
+                var w = System.Diagnostics.Stopwatch.StartNew();
+
+                char[] buffer = new char[1024*1024*100];
+                int n = 0;
+                using (StreamReader reader = File.OpenText(fullPath))
+                using (StreamWriter sw = new StreamWriter(stream))
                 {
-                    for (int i = 0; i < nMax; i++)
+                    while (reader.Peek() > -1)
                     {
-                        //a = a + i.ToString();
-                        //await sw.WriteAsync(('a'));
+                        //var record = csv.GetRecord<myClass>();
+                        //await sw.WriteLineAsync(await reader.ReadLineAsync());
 
-                        var buffer = Encoding.UTF8.GetBytes(Convert.ToString(i));
-
-                        await ms.WriteAsync(buffer, 0, buffer.Length);
-
-                        if (i > 100000 && i % 100000 == 0)
-                        {
-                            //await ms.CopyToAsync(stream);
-                            //await ms.CopyToAsync(stream, ms.GetBuffer().Length);
-                            byte[] aa = ms.GetBuffer();
-
-                            //await ms.FlushAsync();
-                            await stream.WriteAsync(aa, 0, aa.Length);
-
-                            ms.Position = 0;
-                            ms.SetLength(0);
-
-                            //a.Clear();
-                        }
-
-                        //if (i % 10 == 0 && i > 10)
-                        //{
-                        //    await sw.WriteLineAsync();
-                        //    await sw.FlushAsync();
-                        //    //a = string.Empty;
-                        //}
-
-                        //var buffer = new byte[] {1,2};
-                        //await stream.WriteAsync(buffer, 0, buffer.Length);
-                        //await stream.FlushAsync();
+                        n = await reader.ReadAsync(buffer, 0, buffer.Length);
+                        await sw.WriteAsync(buffer, 0, n);
+                        await sw.FlushAsync();
+                        System.Diagnostics.Debug.WriteLine("sw end : " + w.ElapsedMilliseconds);
                     }
-                }
-                catch
-                {
-                    throw;
-                }
-                finally
-                {
-                    stream.Close();
+
+                    await sw.FlushAsync();
+                    System.Diagnostics.Debug.WriteLine("while sw end : " + w.ElapsedMilliseconds);
+
+                    buffer = null;
                 }
             });
            
@@ -127,7 +127,7 @@ namespace DataNavi.Service.Controllers
         [HttpGet, Route("StreamContent")]
         public HttpResponseMessage StreamContent()
         {
-            int nMax = 99999999;
+            int nMax = 10;
 
             List<DeptModel> lstModel = new List<DeptModel>();
 
@@ -138,62 +138,140 @@ namespace DataNavi.Service.Controllers
             //    lstModel = con.Query<DeptModel>(QueryString.Dept_Select, param).ToList();
             //}
 
-            HttpResponseMessage response = Request.CreateResponse(HttpStatusCode.OK);
+            HttpResponseMessage response = Request.CreateResponse();
             //response.Headers.TransferEncodingChunked = true;
             StringBuilder a = new StringBuilder();
-
             MemoryStream ms = new MemoryStream();
-            response.Content = new StreamContent(ms, 1024*1024);
 
+            //StreamWriter sw = new StreamWriter(ms);
+            //sw.Write("a");
+            //sw.Flush();
+            //ms.Seek(0, SeekOrigin.Begin);
+
+            //response.Content = new StreamContent(ms);
+
+            string filePath = @"E:\NAS_SAMPLE\";
+            string fileName = "big_data_1.csv";
+            string fullPath = filePath + fileName;
+
+            TextReader reader = File.OpenText(fullPath);
+
+            var w = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
-                //using (StreamWriter sw = new StreamWriter(stream))
-                //{
-                //sw.NewLine = Environment.NewLine;
-                    StreamWriter sw = new StreamWriter(ms);
 
-                    for (int i = 0; i < nMax; i++)
+
+                CsvReader csv = new CsvReader(reader);
+                csv.Configuration.Delimiter = "\t";
+                csv.Read();
+                csv.ReadHeader();
+
+                System.Diagnostics.Debug.WriteLine("csv.ReadHeader : " + w.ElapsedMilliseconds);
+
+                StreamWriter sw = new StreamWriter(ms);
+                List<myClass> lstMyclass = new List<myClass>();
+
+                while (csv.Read())
+                {
+                    var record = csv.GetRecord<myClass>();
+
+                    if (record.column1.Equals("a"))
                     {
-                        //a = a + i.ToString();
-                        //sw. .Write((Convert.ToString(i)));
-                        //sw.Flush();
-
-                        //if (i % 10 == 0 && i > 10)
-                        //{
-                        //    await sw.WriteLineAsync();
-                        //    await sw.FlushAsync();
-                        //    //a = string.Empty;
-                        //}
-
-                        sw.Write(Convert.ToString(i));
-
-
-                        //await stream.FlushAsync();
-
-                        sw.Flush();
-
-                        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-                        //response.Content.Headers.ContentLength = ms.Length;
+                        lstMyclass.Add(record);
                     }
 
+                }
+                //fs2.Close();
+                csv.Dispose();
 
-                //response.Content.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment");
-                //response.Content.Headers.ContentDisposition.FileName = "aaa";
-              
+                try
+                { 
+               // var aa = csv.GetRecords<myClass>().ToList();
+                System.Diagnostics.Debug.WriteLine("lstMyclass add end : " + w.ElapsedMilliseconds);
 
-                //}
+                    //string bb = 
+                    //System.Diagnostics.Debug.WriteLine("ser end : " + w.ElapsedMilliseconds);
+
+                    //JsonConvert.DeserializeObject<List<myClass>>(bb);
+                    //System.Diagnostics.Debug.WriteLine("des end : " + w.ElapsedMilliseconds);
+
+                    //System.Diagnostics.Debug.WriteLine("while : " + w.ElapsedMilliseconds);
+                    string aaaa = JsonConvert.SerializeObject(lstMyclass, Formatting.None);
+                    System.Diagnostics.Debug.WriteLine("json end : " + w.ElapsedMilliseconds);
+                    sw.Write(aaaa);
+                sw.Flush();
+                System.Diagnostics.Debug.WriteLine("flush end : " + w.ElapsedMilliseconds);
+                    lstMyclass.Clear();
+
+                System.Diagnostics.Debug.WriteLine("lst clear end : " + w.ElapsedMilliseconds);
+                    //response.Content = new StreamContent(File.Open(filePath, FileMode.Open));
+
+                    //sw.Flush();
+                    System.Diagnostics.Debug.WriteLine("write end: " + w.ElapsedMilliseconds);
+                ms.Seek(0, SeekOrigin.Begin);
+                response.Content = new StreamContent(ms, 1024);
+                System.Diagnostics.Debug.WriteLine("StreamContent end : " + w.ElapsedMilliseconds);
+                }catch(Exception ex)
+                {
+                    throw;
+                }
+
             }
             catch
             {
-                throw;
-            }
-            finally
-            {
-                //ms.Close();
+                ms.Close();
             }
 
             return response;
+
+            //try
+            //{
+            //    //using (StreamWriter sw = new StreamWriter(stream))
+            //    //{
+            //    //sw.NewLine = Environment.NewLine;
+            //        StreamWriter sw = new StreamWriter(ms);
+
+            //        for (int i = 0; i < nMax; i++)
+            //        {
+            //            //a = a + i.ToString();
+            //            //sw. .Write((Convert.ToString(i)));
+            //            //sw.Flush();StreamContent
+
+            //            //if (i % 10 == 0 && i > 10)
+            //            //{
+            //            //    await sw.WriteLineAsync();
+            //            //    await sw.FlushAsync();
+            //            //    //a = string.Empty;
+            //            //}
+
+            //            sw.WriteLine(Convert.ToString(i));
+
+
+            //            //await stream.FlushAsync();
+
+            //            sw.Flush();
+
+            //            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            //            //response.Content.Headers.ContentLength = ms.Length;
+            //        }
+
+
+            //response.Content.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment");
+            //response.Content.Headers.ContentDisposition.FileName = "aaa";
+
+
+            //}
+            //}
+            //catch
+            //{
+            //    throw;
+            //}
+            //finally
+            //{
+            //    //ms.Close();
+            //}
+
         }
     }
 
@@ -218,5 +296,21 @@ namespace DataNavi.Service.Controllers
 
         [DataMember]
         public Guid ID { get; set; }
+    }
+
+    [DataContract]
+    public class myClass
+    {
+        [DataMember(Name = "column1")]
+        public string column1 { get; set; }
+
+        [DataMember(Name = "column2")]
+        public string column2 { get; set; }
+
+        [DataMember(Name = "column3")]
+        public string column3 { get; set; }
+
+        [DataMember(Name = "column4")]
+        public string column4 { get; set; }
     }
 }
